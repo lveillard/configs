@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# pi with its own config and extras (MCP adapter, web access, subagents, ledger).
+# Resolves the newest installed pi-plus-<version> so upgrades keep the old dir for rollback.
+export PI_CODING_AGENT_DIR="$HOME/.config/pi-plus"
+export PATH="$HOME/.local/bin:$HOME/.local/share/dev-tools/node/bin:$PATH"
+dir=$(ls -d "$HOME/.local/share/dev-tools"/pi-plus-* 2>/dev/null | sort -V | tail -n 1)
+exec "${dir:?pi-plus is not installed}/node_modules/.bin/pi" "$@"

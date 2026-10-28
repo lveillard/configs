@@ -1,0 +1,7 @@
+# Server-side scripts run on Linux: keep LF regardless of core.autocrlf.
+wezterm/remote/dev-server/** text eol=lf
+wezterm/remote/dev-terminal/** text eol=lf
+*.sh text eol=lf
+dev-servers/box/** text eol=lf
+dev-servers/dev-server-1/dev-server/** text eol=lf
+dev-servers/dev-server-1/dev-terminal/** text eol=lf

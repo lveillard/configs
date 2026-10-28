@@ -1,0 +1,27 @@
+{
+  "theme": "dark",
+  "defaultProvider": "deepseek",
+  "defaultModel": "deepseek-flash",
+  "defaultThinkingLevel": "max",
+  "packages": [
+    "npm:pi-mcp-adapter",
+    "npm:pi-web-access",
+    "npm:pi-subagents",
+    "../../.local/share/dev-tools/extensions/pi-session-ledger"
+  ],
+  "sessionDir": "~/.config/pi-plus/sessions",
+  "enabledModels": [
+    "deepseek-flash",
+    "xiaomi-token-plan-sgp/mimo-v2.6-pro",
+    "xiaomi-token-plan-sgp/mimo-v2.6-flash",
+    "glm-5.3",
+    "glm-5.3-flash",
+    "kimi-coding/k3.1-pro"
+  ],
+  "compaction": {
+    "reserveTokens": 65536
+  },
+  "extensions": [
+    "-builtin:mcp"
+  ]
+}

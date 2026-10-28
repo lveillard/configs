@@ -1,0 +1,30 @@
+#!/usr/bin/python3
+"""Mouse and keyboard action menu, attached to the requesting tmux client."""
+import subprocess
+import sys
+
+command=['/usr/bin/tmux','-L','dev-sessions','display-menu','-O','-x','C','-y','C',
+         '-T',' Ayuda: Ctrl+B, soltar, y despues la tecla ']
+if len(sys.argv)>1: command += ['-c',sys.argv[1]]
+if len(sys.argv)>2: command += ['-t',sys.argv[2]]
+command.append('--')
+entries=[
+    ('-Aqui puedes usar la letra, las flechas o el raton','',''),
+    None,
+    ('Selector de terminales  [F12]','m',"display-popup -E -w 95% -h 95% -T ' Dev Sessions ' /home/devuser/.local/bin/dev"),
+    ('Arbol de sesiones y ventanas','s','choose-tree -sZ'),
+    ('Nueva ventana en esta carpeta','c','new-window -c "#{pane_current_path}"'),
+    ('Renombrar esta sesion','r','command-prompt -I "#S" -p "Nombre de la sesion:" \'rename-session -- "%%"\''),
+    None,
+    ('Panel a la derecha','v','split-window -h -c "#{pane_current_path}"'),
+    ('Panel debajo','h','split-window -v -c "#{pane_current_path}"'),
+    ('Ampliar / restaurar panel','z','resize-pane -Z'),
+    ('Ventana siguiente','n','next-window'),
+    ('Ventana anterior','p','previous-window'),
+    ('-Ctrl+B + flecha cambia de panel; el raton tambien','',''),
+    None,
+    ('Desconectar: los procesos siguen','d','detach-client'),
+    ('Volver a la terminal','Escape',''),
+]
+for entry in entries: command.extend(entry if entry else [''])
+raise SystemExit(subprocess.run(command).returncode)

@@ -1,0 +1,2 @@
+# Read by every zsh, including non-interactive "ssh box cmd" and phone shortcuts.
+export PATH="$HOME/.local/bin:$HOME/.local/share/dev-tools/node/bin:$HOME/.bun/bin:$HOME/.atuin/bin:$PATH"

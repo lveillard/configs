@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+umask 077
+export ZDOTDIR="$HOME/.config/dev-terminal/zsh"
+export PATH="$HOME/.local/bin:$HOME/.local/share/dev-tools/node/bin:$HOME/.cargo/bin:$HOME/.bun/bin:$PATH"
+if [[ ${1:-shell} != shell ]]; then
+    "$HOME/.local/bin/dev-profile" "$1"
+    printf '\nCLI terminada. La terminal sigue abierta; usa el alias para volver a iniciarla.\n'
+fi
+exec /usr/bin/zsh -l

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Claude Code under a separate account: symlink as claude-<name> (e.g. claude-personal).
+# Each name keeps its own login and settings in ~/.config/claude-profiles/<name>.
+name=$(basename "$0")
+export CLAUDE_CONFIG_DIR="$HOME/.config/claude-profiles/$name"
+mkdir -p "$CLAUDE_CONFIG_DIR" && chmod 700 "$CLAUDE_CONFIG_DIR"
+exec "$HOME/.local/bin/claude" "$@"

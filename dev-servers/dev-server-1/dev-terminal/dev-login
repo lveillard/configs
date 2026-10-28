@@ -1,0 +1,21 @@
+#!/usr/bin/python3
+import json
+import os
+from pathlib import Path
+import sys
+
+root=Path.home()/'.config/dev-profiles'
+profiles=json.loads((root/'profiles.json').read_text())['profiles']
+name=sys.argv[1] if len(sys.argv)>1 else ''
+if name.startswith('claude-api') or name=='bedrock':
+    env=os.environ.copy()
+    env.update(AWS_CONFIG_FILE=str(root/'aws/config'),AWS_SHARED_CREDENTIALS_FILE=str(root/'aws/credentials'))
+    binary=str(Path.home()/'.local/share/dev-tools/aws-bin/aws')
+    os.execve(binary,[binary,'login','--profile','default','--remote'],env)
+if name not in profiles:
+    raise SystemExit('Usage: dev-login codex[-sap|-vei] | claude[-sap|-vei|-bg] | grok | devin | gemini | bedrock')
+engine=profiles[name]['engine']
+args={'codex':['login','--device-auth'],'claude':['auth','login'],'grok':['login','--device-auth'],'devin':['auth','login','--force-manual-token-flow'],'gemini':[]}.get(engine)
+if args is None or name.endswith('-api'): raise SystemExit('This profile uses the migrated API credentials.')
+binary=str(Path.home()/'.local/bin'/name)
+os.execv(binary,[binary,*args])

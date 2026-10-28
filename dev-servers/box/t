@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# t           list sessions and pick one (or create "main")
+# t <name>    attach to <name>, creating it in the current folder if needed
+set -euo pipefail
+if [ $# -gt 0 ]; then
+  if [ -n "${TMUX:-}" ]; then
+    tmux has-session -t "=$1" 2>/dev/null || tmux new-session -d -s "$1" -c "$PWD"
+    exec tmux switch-client -t "=$1"
+  fi
+  exec tmux new-session -A -s "$1" -c "$PWD"
+fi
+if ! tmux ls >/dev/null 2>&1; then exec tmux new-session -A -s main -c "$HOME/projects"; fi
+tmux ls -F '#{session_name}  (#{session_windows} win, #{?session_attached,attached,idle}, #{pane_current_command})'
+read -rp 'Session name (Enter = first): ' name
+[ -z "$name" ] && name=$(tmux ls -F '#{session_name}' | head -1)
+exec "$0" "$name"

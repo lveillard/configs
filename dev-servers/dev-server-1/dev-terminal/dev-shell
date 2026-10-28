@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+umask 077
+export ZDOTDIR="$HOME/.config/dev-terminal/zsh"
+exec /usr/bin/zsh "$@"

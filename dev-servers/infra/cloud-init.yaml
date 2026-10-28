@@ -1,0 +1,130 @@
+#cloud-config
+package_update: true
+packages:
+  - build-essential
+  - ca-certificates
+  - curl
+  - git
+  - jq
+  - unzip
+  - zip
+  - ripgrep
+  - python3-venv
+  - pipx
+  - tmux
+  - socat
+  - htop
+  - docker.io
+  - docker-compose-v2
+  - sysstat
+  - time
+  - earlyoom
+  - gh
+  - postgresql-client
+swap:
+  filename: /swapfile
+  size: 16G
+  maxsize: 16G
+write_files:
+  - path: /etc/ssh/sshd_config.d/10-dev-server.conf
+    permissions: '0644'
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+  - path: /etc/wezterm/wezterm.lua
+    permissions: '0644'
+    content: |
+      local wezterm = require 'wezterm'
+      return {
+        unix_domains = {{ name = '${name}', socket_path = '/home/${user}/.local/state/wezterm/dev-server.sock' }},
+        default_prog = { '/bin/bash', '-l' },
+        default_cwd = '/home/${user}/projects',
+        scrollback_lines = 10000,
+        initial_cols = 120,
+        initial_rows = 28,
+      }
+  - path: /etc/systemd/system/wezterm-mux.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Persistent WezTerm development sessions
+      After=network.target
+      [Service]
+      Type=simple
+      User=${user}
+      Group=${user}
+      Environment=HOME=/home/${user}
+      Environment=WEZTERM_UNIX_SOCKET=/home/${user}/.local/state/wezterm/dev-server.sock
+      ExecStart=/usr/bin/wezterm-mux-server --config-file /etc/wezterm/wezterm.lua
+      Restart=on-failure
+      RestartSec=3
+      UMask=0077
+      [Install]
+      WantedBy=multi-user.target
+  - path: /etc/default/earlyoom
+    permissions: '0644'
+    content: |
+      # Kill build and test workers first when memory is nearly gone, so sshd, the mux and the agents stay alive.
+      EARLYOOM_ARGS="-m 6 -s 10 -r 3600 -p --prefer '(^|/)(tsc|tsgo|vitest|esbuild|turbo|bun|chrome|chromium|headless_shell|cc1|cc1plus|ld|lld)$' --avoid '(^|/)(sshd|systemd|systemd-journal|wezterm-mux-ser|tailscaled|dockerd|containerd|claude|codex)$'"
+  - path: /etc/sysctl.d/90-dev-server.conf
+    permissions: '0644'
+    content: |
+      vm.swappiness=10
+      fs.inotify.max_user_watches=1048576
+      fs.inotify.max_user_instances=1024
+  - path: /etc/profile.d/dev-tools.sh
+    permissions: '0644'
+    content: |
+      case ":$PATH:" in *":$${HOME}/.local/bin:"*) ;; *) PATH="$${HOME}/.local/bin:$PATH" ;; esac
+      export PATH
+  - path: /home/${user}/.bash_aliases
+    owner: ${user}:${user}
+    permissions: '0644'
+    defer: true
+    content: |
+      # Project A box: make the host unmistakable in the prompt.
+      PS1='\[\e[1;36m\]${prompt_label}\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ '
+      export BUN_INSTALL="$${HOME}/.bun"
+  - path: /usr/local/sbin/install-dev-tools.sh
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      # Runs as the login user. Versions follow the project's package.json (node >=26.9 <27, bun 1.4.2).
+      set -euo pipefail
+      NODE_VERSION=v26.11.1
+      BUN_VERSION=1.4.2
+      tools="$${HOME}/.local/share/dev-tools"
+      bin="$${HOME}/.local/bin"
+      mkdir -p "$tools" "$bin" "$${HOME}/projects" "$${HOME}/.local/state/wezterm"
+      chmod 700 "$${HOME}/.local/state/wezterm"
+      cd /tmp
+      asset="node-$NODE_VERSION-linux-x64.tar.xz"
+      curl -fsSL --retry 3 -o "$asset" "https://nodejs.org/dist/$NODE_VERSION/$asset"
+      curl -fsSL --retry 3 "https://nodejs.org/dist/$NODE_VERSION/SHASUMS256.txt" | grep " $asset\$" | sha256sum -c -
+      tar -xJf "$asset" -C "$tools"
+      ln -sfn "$tools/node-$NODE_VERSION-linux-x64" "$tools/node"
+      for b in node npm npx corepack; do ln -sfn "$tools/node/bin/$b" "$bin/$b"; done
+      export PATH="$tools/node/bin:$bin:$PATH"
+      curl -fsSL --retry 3 https://bun.sh/install | BUN_INSTALL="$${HOME}/.bun" bash -s "bun-v$BUN_VERSION"
+      ln -sfn "$${HOME}/.bun/bin/bun" "$bin/bun"
+      ln -sfn "$${HOME}/.bun/bin/bunx" "$bin/bunx"
+      curl -fsSL --retry 3 https://claude.ai/install.sh | bash
+      npm install -g @openai/codex
+      ln -sfn "$tools/node/bin/codex" "$bin/codex"
+      rm -f "$asset"
+      echo "dev tools installed: node $(node -v), bun $(bun -v), claude $(claude --version | head -1), codex $(codex --version)"
+runcmd:
+  - [install, -d, -o, ${user}, -g, ${user}, -m, '0700', /home/${user}/.local, /home/${user}/.local/state, /home/${user}/.local/state/wezterm]
+  - [install, -d, -o, ${user}, -g, ${user}, -m, '0755', /home/${user}/.local/bin, /home/${user}/projects]
+  - [bash, -lc, 'curl -fsSL --retry 3 https://tailscale.com/install.sh | sh']
+  - [sysctl, --system]
+  - [systemctl, daemon-reload]
+  # The WezTerm package is uploaded after first boot (pinned to the workstation client version); the unit starts once it is installed.
+  - [systemctl, enable, wezterm-mux.service]
+  - [usermod, -aG, docker, ${user}]
+  - [systemctl, enable, --now, docker]
+  - [systemctl, enable, --now, earlyoom]
+  - [bash, -lc, 'sudo -u ${user} -H bash /usr/local/sbin/install-dev-tools.sh > /var/log/install-dev-tools.log 2>&1']
+  - [systemctl, reload-or-restart, ssh]
+final_message: '${name} provisioning complete after $UPTIME seconds'

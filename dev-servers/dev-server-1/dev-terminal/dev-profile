@@ -1,0 +1,47 @@
+#!/usr/bin/python3
+"""Run a named CLI with isolated config and only its own API credentials."""
+import json
+import os
+from pathlib import Path
+import sys
+
+root = Path.home() / '.config/dev-profiles'
+profiles = json.loads((root / 'profiles.json').read_text())
+name = Path(sys.argv[0]).name
+args = sys.argv[1:]
+if name == 'dev-profile':
+    if not args or args[0] == 'list':
+        print('\n'.join(profiles['profiles']))
+        raise SystemExit(0)
+    name, *args = args
+if name not in profiles['profiles']:
+    raise SystemExit('Unknown CLI profile: ' + name)
+profile = profiles['profiles'][name]
+env = os.environ.copy()
+for key in list(env):
+    if key.startswith(('ANTHROPIC_', 'CLAUDE_CODE_', 'OPENAI_', 'AZURE_OPENAI_', 'CODEX_', 'GROK_', 'PI_JEV_')) or key in (
+        'CLAUDECODE', 'CLAUDE_CONFIG_DIR', 'XAI_API_KEY', 'QWEN38_API_KEY', 'DEEPSEEK_API_KEY',
+        'TYPESAFE_API_KEY', 'PI_CODING_AGENT_DIR', 'GEMINI_API_KEY', 'GOOGLE_API_KEY',
+        'AWS_PROFILE', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN',
+        'AWS_CONFIG_FILE', 'AWS_SHARED_CREDENTIALS_FILE', 'AWS_BEARER_TOKEN_BEDROCK',
+    ):
+        env.pop(key, None)
+env['PATH'] = ':'.join([str(Path.home()/'.local/bin'), str(Path.home()/'.local/share/dev-tools/node/bin'), env.get('PATH','')])
+env.update(profile.get('env', {}))
+secret_group = profile.get('secrets')
+if secret_group:
+    env.update(json.loads((root/'secrets.json').read_text())[secret_group])
+if name == 'claude-api' and '--pool' in args:
+    index = args.index('--pool')
+    pools = {'eu1': ('eu','eu-west-1'), 'global-eu1': ('global','eu-west-1'), 'eu2': ('eu','eu-central-1'), 'global-eu2': ('global','eu-central-1')}
+    if index+1 == len(args) or args[index+1] not in pools:
+        raise SystemExit('--pool: eu1 | global-eu1 | eu2 | global-eu2')
+    scope, region = pools[args[index+1]]
+    del args[index:index+2]
+    for key in ('ANTHROPIC_DEFAULT_OPUS_MODEL','ANTHROPIC_DEFAULT_SONNET_MODEL','ANTHROPIC_DEFAULT_HAIKU_MODEL'):
+        env[key] = scope + '.' + env[key].split('.',1)[1]
+    env.update(AWS_REGION=region, AWS_DEFAULT_REGION=region, ANTHROPIC_SMALL_FAST_MODEL_AWS_REGION=region)
+if profile['engine'].startswith('pi') and any('deepseek-v4-pro' in a for a in args):
+    raise SystemExit('DeepSeek Pro is disabled: use --model deepseek-flash (DeepSeek V4.1 Flash)')
+binary = profiles['executables'][profile['engine']]
+os.execve(binary, [binary, *profile.get('args',[]), *args], env)

@@ -1,0 +1,66 @@
+#cloud-config
+package_update: true
+packages:
+  - build-essential
+  - ca-certificates
+  - curl
+  - git
+  - jq
+  - unzip
+  - zip
+  - ripgrep
+  - python3-venv
+  - pipx
+  - tmux
+  - socat
+  - htop
+  - docker.io
+  - sysstat
+  - time
+write_files:
+  - path: /etc/ssh/sshd_config.d/10-dev-server.conf
+    permissions: '0644'
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+  - path: /etc/wezterm/wezterm.lua
+    permissions: '0644'
+    content: |
+      local wezterm = require 'wezterm'
+      return {
+        unix_domains = {{ name = 'dev-server-1', socket_path = '/home/devuser/.local/state/wezterm/dev-server.sock' }},
+        default_prog = { '/bin/bash', '-l' },
+        default_cwd = '/home/devuser/projects',
+        scrollback_lines = 10000,
+        initial_cols = 120,
+        initial_rows = 28,
+      }
+  - path: /etc/systemd/system/wezterm-mux.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Persistent WezTerm development sessions
+      After=network.target
+      [Service]
+      Type=simple
+      User=devuser
+      Group=devuser
+      Environment=HOME=/home/devuser
+      Environment=WEZTERM_UNIX_SOCKET=/home/devuser/.local/state/wezterm/dev-server.sock
+      ExecStart=/usr/bin/wezterm-mux-server --config-file /etc/wezterm/wezterm.lua
+      Restart=on-failure
+      RestartSec=3
+      UMask=0077
+      [Install]
+      WantedBy=multi-user.target
+runcmd:
+  - [bash, -lc, 'set -euo pipefail; cd /tmp; case "$(dpkg --print-architecture)" in arm64) asset=wezterm-nightly.Ubuntu24.04.arm64.deb; digest=2f3ecf71836211d4085b1375744eff1fc11fe531539297df9c85f776e8b8c0bd ;; amd64) asset=wezterm-nightly.Ubuntu24.04.deb; digest=2d8c2d47e6ad666046cfd59632962cef91ec0f83967c12f31ff4fe40e0b0f2de ;; *) exit 1 ;; esac; curl -fsSL --retry 3 -o wezterm.deb "https://github.com/wezterm/wezterm/releases/download/nightly/$asset"; echo "$digest  wezterm.deb" | sha256sum -c -; DEBIAN_FRONTEND=noninteractive apt-get install -y ./wezterm.deb']
+  - [install, -d, -o, devuser, -g, devuser, -m, '0700', /home/devuser/.local, /home/devuser/.local/state, /home/devuser/.local/state/wezterm]
+  - [install, -d, -o, devuser, -g, devuser, -m, '0755', /home/devuser/projects]
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, --now, wezterm-mux.service]
+  - [usermod, -aG, docker, devuser]
+  - [systemctl, enable, --now, docker]
+  - [systemctl, reload-or-restart, ssh]
+final_message: 'dev-server-1 provisioning complete after $UPTIME seconds'

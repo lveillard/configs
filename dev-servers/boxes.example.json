@@ -1,0 +1,84 @@
+{
+  "region": "spaincentral",
+  "zone": "3",
+  "user": "devuser",
+  "tailnet": "your-tailnet.ts.net",
+  "weztermGui": "C:/Program Files/WezTerm/wezterm-gui.exe",
+  "boxes": [
+    {
+      "name": "dev-server-1",
+      "label": "example",
+      "shortcut": "WezTerm Remote",
+      "description": "Example project",
+      "subscriptionId": "00000000-0000-0000-0000-000000000000",
+      "resourceGroup": "rg-dev-server-1",
+      "stateDir": "wezterm-remote",
+      "terraform": null
+    },
+    {
+      "name": "dev-server-project-a",
+      "label": "project-a",
+      "shortcut": "WezTerm Remote Project A",
+      "description": "Project A",
+      "subscriptionId": "00000000-0000-0000-0000-000000000000",
+      "resourceGroup": "rg-dev-server-project-a",
+      "stateDir": "wezterm-remote-project-a",
+      "tint": {
+        "background": "#070d10",
+        "split": "#1f4a4a",
+        "tmux": "#1f6f6f"
+      },
+      "terraform": {
+        "vmSize": "Standard_D8as_v5",
+        "osDiskGb": 256,
+        "addressSpace": "10.41.0.0/16"
+      }
+    },
+    {
+      "name": "dev-server-project-b",
+      "label": "project-b",
+      "shortcut": "WezTerm Remote Sideproj",
+      "description": "Side projects",
+      "subscriptionId": "00000000-0000-0000-0000-000000000000",
+      "resourceGroup": "rg-dev-server-project-b",
+      "stateDir": "wezterm-remote-project-b",
+      "tint": {
+        "background": "#0d0812",
+        "split": "#3a2450",
+        "tmux": "#5b3a80"
+      },
+      "terraform": {
+        "vmSize": "Standard_D8as_v5",
+        "osDiskGb": 256,
+        "addressSpace": "10.42.0.0/16"
+      },
+      "claudeProfiles": [
+        "claude-personal",
+        "claude-secondary"
+      ]
+    },
+    {
+      "name": "dev-server-project-c",
+      "label": "project-c",
+      "shortcut": "WezTerm Remote Project C",
+      "description": "Project C",
+      "subscriptionId": "00000000-0000-0000-0000-000000000000",
+      "resourceGroup": "rg-dev-server-project-c",
+      "stateDir": "wezterm-remote-project-c",
+      "tint": {
+        "background": "#110c06",
+        "split": "#5a3a14",
+        "tmux": "#7a4a12"
+      },
+      "terraform": {
+        "vmSize": "Standard_D8as_v5",
+        "osDiskGb": 256,
+        "addressSpace": "10.43.0.0/16"
+      },
+      "claudeProfiles": [
+        "claude-personal",
+        "claude-secondary"
+      ]
+    }
+  ]
+}

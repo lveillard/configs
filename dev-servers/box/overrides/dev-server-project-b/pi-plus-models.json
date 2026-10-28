@@ -1,0 +1,231 @@
+{
+  "providers": {
+    "deepseek": {
+      "modelOverrides": {
+        "deepseek-flash": {
+          "name": "DeepSeek V4.1 Flash",
+          "contextWindow": 600000,
+          "maxTokens": 393216
+        }
+      }
+    },
+    "xiaomi": {
+      "baseUrl": "https://api.xiaomimimo.com/v1",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "mimo-v2.6-pro",
+          "name": "MiMo V2.6 Pro",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1048576,
+          "maxTokens": 131072,
+          "cost": {
+            "input": 0.435,
+            "output": 0.87,
+            "cacheRead": 0.0036,
+            "cacheWrite": 0
+          },
+          "compat": {
+            "thinkingFormat": "deepseek",
+            "requiresReasoningContentOnAssistantMessages": true,
+            "supportsStrictMode": true,
+            "supportsReasoningEffort": false
+          }
+        },
+        {
+          "id": "mimo-v2.6-pro-ultraspeed",
+          "name": "MiMo V2.6 Pro UltraSpeed",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1048576,
+          "maxTokens": 131072,
+          "cost": {
+            "input": 4.35,
+            "output": 8.7,
+            "cacheRead": 0.036,
+            "cacheWrite": 0
+          },
+          "compat": {
+            "thinkingFormat": "deepseek",
+            "requiresReasoningContentOnAssistantMessages": true,
+            "supportsStrictMode": true,
+            "supportsReasoningEffort": false
+          }
+        },
+        {
+          "id": "mimo-v2.6-flash",
+          "name": "MiMo V2.6 Flash",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1048576,
+          "maxTokens": 131072,
+          "cost": {
+            "input": 0.14,
+            "output": 0.28,
+            "cacheRead": 0.0028,
+            "cacheWrite": 0
+          },
+          "compat": {
+            "thinkingFormat": "deepseek",
+            "requiresReasoningContentOnAssistantMessages": true,
+            "supportsStrictMode": true,
+            "supportsReasoningEffort": false
+          }
+        }
+      ]
+    },
+    "xiaomi-token-plan-sgp": {
+      "baseUrl": "https://token-plan-sgp.xiaomimimo.com/v1",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "mimo-v2.6-pro",
+          "name": "MiMo V2.6 Pro",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1048576,
+          "maxTokens": 131072,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "compat": {
+            "thinkingFormat": "deepseek",
+            "requiresReasoningContentOnAssistantMessages": true,
+            "supportsStrictMode": true,
+            "supportsReasoningEffort": false
+          }
+        },
+        {
+          "id": "mimo-v2.6-flash",
+          "name": "MiMo V2.6 Flash",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1048576,
+          "maxTokens": 131072,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "compat": {
+            "thinkingFormat": "deepseek",
+            "requiresReasoningContentOnAssistantMessages": true,
+            "supportsStrictMode": true,
+            "supportsReasoningEffort": false
+          }
+        }
+      ]
+    },
+    "azure-foundry": {
+      "baseUrl": "https://eastus.api.cognitive.microsoft.com/openai/v1",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "glm-5.3",
+          "name": "GLM 5.3 (Foundry)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 1048576,
+          "maxTokens": 131072,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "compat": {
+            "supportsDeveloperRole": false,
+            "supportsReasoningEffort": false,
+            "supportsStrictMode": false
+          }
+        },
+        {
+          "id": "glm-5.3-flash",
+          "name": "GLM 5.3 Flash (Foundry)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 1048576,
+          "maxTokens": 131072,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "compat": {
+            "supportsDeveloperRole": false,
+            "supportsReasoningEffort": false,
+            "supportsStrictMode": false
+          }
+        }
+      ]
+    },
+    "kimi-coding": {
+      "baseUrl": "https://api.kimi.com/coding/v1",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "k3.1-pro",
+          "name": "Kimi K3.1 Pro (plan; API-equivalent cost)",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 262144,
+          "maxTokens": 131072,
+          "cost": {
+            "input": 2,
+            "output": 10,
+            "cacheRead": 0.2,
+            "cacheWrite": 2
+          },
+          "thinkingLevelMap": {
+            "off": null,
+            "minimal": null,
+            "low": "low",
+            "medium": null,
+            "high": "high",
+            "xhigh": null,
+            "max": "max"
+          },
+          "compat": {
+            "supportsStrictMode": false,
+            "supportsStore": false,
+            "supportsDeveloperRole": false,
+            "supportsReasoningEffort": true,
+            "maxTokensField": "max_tokens",
+            "thinkingFormat": "openai",
+            "requiresReasoningContentOnAssistantMessages": true,
+            "supportsMidConvoSystemMessages": true,
+            "supportsMidConvoToolAdditions": true
+          }
+        }
+      ]
+    }
+  }
+}

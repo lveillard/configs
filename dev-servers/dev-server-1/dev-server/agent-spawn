@@ -1,0 +1,25 @@
+#!/bin/bash
+# agent-spawn: start an agent in its OWN mux workspace, labelled for the session manager.
+# usage: agent-spawn "<session name>" <cwd> <identity: codex|devin|pi|grok|claude|gemini> <model label> -- <command...>
+# A plain `wezterm cli spawn --new-window` lands in the shared "default" workspace and opens a GUI
+# window per agent on every attached client; this wrapper makes the workspace mandatory.
+# The agent itself runs inside a DETACHED tmux session on the VM (real session): closing the WezTerm
+# window/tab/pane (locally or here) only kills the tmux client and the agent keeps running.
+# Stop an agent for real with: agent-kill <session name>   (set AGENT_SPAWN_TMUX=0 to skip tmux)
+set -euo pipefail
+[ $# -ge 6 ] && [ "$5" = "--" ] || { echo "usage: agent-spawn <session> <cwd> <identity> <model> -- <cmd...>" >&2; exit 2; }
+name=$1 cwd=$2 identity=$3 model=$4; shift 5
+[ -n "$name" ] && [ "$name" != default ] || { echo "agent-spawn: a session name is required" >&2; exit 2; }
+export WEZTERM_UNIX_SOCKET=${WEZTERM_UNIX_SOCKET:-"$HOME/.local/state/wezterm/dev-server.sock"}
+b64() { printf %s "$1" | base64 | tr -d '\n'; }
+setvar="printf '\033]1337;SetUserVar=CLI_IDENTITY=$(b64 "$identity")\007\033]1337;SetUserVar=CLI_MODEL=$(b64 "$model")\007'"
+cmd=$(printf '%q ' "$@")
+inner="$setvar; $cmd; exec bash"
+if [ "${AGENT_SPAWN_TMUX:-1}" = "0" ] || ! command -v tmux >/dev/null 2>&1; then
+  exec wezterm cli spawn --new-window --workspace "$name" --cwd "$cwd" -- bash -lc "$inner"
+fi
+tname=$(printf %s "$name" | tr -c 'A-Za-z0-9_-' '_')
+if tmux has-session -t "=$tname" 2>/dev/null; then echo "agent-spawn: tmux session $tname already exists" >&2; exit 3; fi
+tmux new-session -d -s "$tname" -c "$cwd" -x 200 -y 50 "bash -lc $(printf %q "$inner")"
+tmux set-option -t "=$tname" status off >/dev/null 2>&1 || true
+exec wezterm cli spawn --new-window --workspace "$name" --cwd "$cwd" -- bash -lc "$setvar; tmux attach-session -t =$tname; exec bash"

@@ -1,0 +1,218 @@
+#!/usr/bin/python3
+"""Small persistent terminal manager; each session lives in a private tmux server."""
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import shlex
+import subprocess
+import sys
+
+HOME = Path.home()
+ROOT = HOME / '.config/dev-terminal'
+TMUX = ['/usr/bin/tmux', '-L', 'dev-sessions', '-f', str(ROOT/'tmux.conf')]
+
+def tmux(*args, check=True):
+    return subprocess.run([*TMUX,*args],capture_output=True,text=True,check=check)
+
+def sessions():
+    result=tmux('list-sessions','-F','#{session_name}\t#{session_windows}\t#{session_attached}\t#{@dev-profile}',check=False)
+    return [line.split('\t') for line in result.stdout.splitlines()]
+
+def choose(lines, prompt, header, preview=None, hotkeys=None, help_enabled=True):
+    hotkeys=dict(hotkeys or {})
+    if help_enabled: hotkeys['f1']='\0help'
+    query=''
+    while True:
+        command=['fzf','--layout=reverse','--border=rounded','--padding=1,2',
+                 '--border-label',' '+prompt+' ','--prompt','Buscar > ',
+                 '--header-first','--header',header,'--no-multi','--cycle',
+                 '--info=inline-right','--no-sort','--print-query','--query',query,
+                 '--bind','double-click:accept',
+                 '--color','bg:#17212b,bg+:#293b4b,fg:#c7d5e0,fg+:#ffffff,hl:#66d9b0,hl+:#66d9b0,border:#50738b,header:#9bb9cd,prompt:#66d9b0,pointer:#66d9b0,label:#66d9b0']
+        if hotkeys: command += ['--expect',','.join(hotkeys)]
+        if preview:
+            command += ['--preview',preview,'--preview-label',' Detalles ',
+                        '--preview-window','right:45%:wrap:<110(down:40%:wrap)']
+        # fzf draws on stderr; leave it connected to the terminal, capture only the choice.
+        result=subprocess.run(command,input='\n'.join(lines),stdout=subprocess.PIPE,text=True)
+        if result.returncode != 0: return None
+        output=result.stdout.splitlines()
+        query=output[0] if output else ''
+        key=output[1] if hotkeys and len(output)>1 else ''
+        action=hotkeys.get(key)
+        if action=='\0help':
+            show_help()
+            continue
+        if action: return action
+        index=2 if hotkeys else 1
+        return output[index] if len(output)>index else None
+
+def show_help():
+    choose([
+        'Ctrl+B: manten Ctrl, pulsa B, suelta ambas; despues pulsa la tecla.',
+        'La barra inferior resalta las opciones al pulsar Ctrl+B.',
+        'F1                 Ayuda: menu con acciones dentro de una terminal',
+        'F12                Selector de terminales',
+        'Ctrl+B, s          Arbol de sesiones y ventanas',
+        'Ctrl+B, c          Nueva ventana en la carpeta actual',
+        'Ctrl+B, v          Dividir: panel a la derecha',
+        'Ctrl+B, h          Dividir: panel debajo',
+        'Ctrl+B, flecha     Moverse entre paneles (tambien con el raton)',
+        'Ctrl+B, z          Ampliar / restaurar el panel actual',
+        'Ctrl+B, n / p      Ventana siguiente / anterior',
+        'Ctrl+B, r          Cambiar el nombre de la sesion',
+        'Ctrl+B, d          Desconectar y volver al selector; el proceso sigue',
+        'Ctrl+B, Esc        Cancelar el prefijo sin enviar una tecla al programa',
+        'Ctrl+Shift+Q       Reenviar Alt+Arriba a las preguntas de Codex',
+        'Raton             Elegir panel o ventana; clic en F1 Ayuda abre el menu',
+        'Ctrl+N / Ctrl+R    En el selector: crear terminal / actualizar lista',
+        'Cerrar Windows    Las terminales siguen mientras la VM este encendida',
+        'exit              Cierra la shell; para conservarla usa Ctrl+B, d',
+    ],'Ayuda y atajos','Enter, F1 o Esc: volver | Escribe para buscar una accion\nCada terminal puede tener varias ventanas y paneles.',
+    hotkeys={'f1':'\0close'},help_enabled=False)
+
+def attach(name):
+    if os.environ.get('TMUX'):
+        result=tmux('switch-client','-t',name,check=False)
+    else:
+        result=subprocess.run([*TMUX,'attach-session','-t',name])
+    return result.returncode==0
+
+def new(name, cwd, profile='shell', attach_after=True):
+    if not re.fullmatch(r'[A-Za-z0-9_-]{1,64}',name):
+        raise ValueError('Usa letras, numeros, guiones o _ en el nombre (maximo 64).')
+    cwd=Path(cwd).expanduser().resolve()
+    if not cwd.is_dir(): raise ValueError('La carpeta ya no existe: '+str(cwd))
+    profiles=json.loads((HOME/'.config/dev-profiles/profiles.json').read_text())['profiles']
+    if profile != 'shell' and profile not in profiles: raise ValueError('Perfil desconocido: '+profile)
+    command=' '.join(shlex.quote(x) for x in [str(ROOT/'session-shell'),profile])
+    result=tmux('new-session','-d','-s',name,'-c',str(cwd),command,check=False)
+    if result.returncode: raise ValueError(result.stderr.strip())
+    tmux('set-option','-t',name,'@dev-profile',profile)
+    return attach(name) if attach_after else True
+
+def create_interactive():
+    project_root=HOME/'projects'
+    paths=[project_root]
+    if project_root.is_dir():
+        for p in sorted(project_root.iterdir()):
+            if p.is_dir() and not p.name.startswith('.'):
+                paths.append(p)
+                worktrees=p/'.worktrees'
+                if worktrees.is_dir(): paths.extend(sorted(x for x in worktrees.iterdir() if x.is_dir()))
+    locations={str(p).replace(str(HOME),'~',1):str(p) for p in [*paths,HOME]}
+    label=choose(list(locations),'Nueva terminal · 1/3 · Proyecto',
+                 'Flechas o raton: elegir | Enter: continuar | F1: ayuda | Esc: cancelar\nElige el proyecto o la rama en la que vas a trabajar.')
+    if not label: return False
+    selected=locations[label]
+    names=list(json.loads((HOME/'.config/dev-profiles/profiles.json').read_text())['profiles'])
+    descriptions={
+        'shell':'Shell zsh · para comandos, builds o login',
+        'codex':'Cuenta principal','codex-work':'Cuenta Project A','codex-personal':'Personal account',
+        'codex-api':'Azure Foundry · Astra / Sol / Terra / Luna',
+        'claude':'Cuenta principal','claude-work':'Cuenta Project A','claude-personal':'Personal account','claude-secondary':'Work account',
+        'claude-api':'Bedrock · Opus · EU, eu-west-1',
+        'claude-api-global':'Bedrock · Opus · global, eu-west-1',
+        'claude-api-eu2':'Bedrock · Opus · EU, eu-central-1',
+        'claude-api-global-eu2':'Bedrock · Opus · global, eu-central-1',
+        'claude-api-sonnet':'Bedrock · Sonnet · EU',
+        'grok':'Cuenta Grok','grok-api':'Azure Foundry · Grok',
+        'grok-qwen':'Qwen · ai.example.com',
+        'pi':'DeepSeek','pi-plus':'DeepSeek + Ledger',
+        'pi-plus-jev':'DeepSeek + Ledger + Jev',
+        'devin':'Cuenta Devin','gemini':'Cuenta Google',
+    }
+    options=[name+'  | '+descriptions.get(name,name) for name in ['shell',*names]]
+    choice=choose(options,'Nueva terminal · 2/3 · Herramienta',
+                  'Enter: continuar | F1: ayuda | Esc: cancelar\nProyecto: '+label)
+    if not choice: return False
+    profile=choice.split('  |',1)[0]
+    base=re.sub(r'[^A-Za-z0-9_-]','-',Path(selected).name+'-'+profile)[:50]
+    used={row[0] for row in sessions()}
+    name=base; suffix=2
+    while name in used: name=base+'-'+str(suffix); suffix+=1
+    print('\nNueva terminal · 3/3 · Nombre\nProyecto: '+label+'\nHerramienta: '+profile)
+    print('Enter acepta el nombre sugerido. Ctrl+C cancela. Letras, numeros, - o _.')
+    while True:
+        try: entered=input('Nombre ['+name+']: ').strip()
+        except (EOFError,KeyboardInterrupt): return False
+        candidate=entered or name
+        if candidate in {row[0] for row in sessions()}:
+            print('Ya existe esa terminal. Elige otro nombre o vuelve con Ctrl+C.')
+            continue
+        if not re.fullmatch(r'[A-Za-z0-9_-]{1,64}',candidate):
+            print('Nombre no valido: usa letras, numeros, - o _ (maximo 64).')
+            continue
+        return new(candidate,selected,profile)
+
+def menu():
+    if not sys.stdin.isatty(): raise SystemExit('Open an interactive terminal, or use: dev list')
+    message=''
+    while True:
+        saved=sessions()
+        rows=['+  Nueva terminal  [Ctrl+N]']
+        for name,windows,attached,profile in saved:
+            state='En uso' if int(attached) else 'En segundo plano'
+            count=windows+(' ventana' if windows=='1' else ' ventanas')
+            rows.append(f'{name}  | {state} · {count} · {profile or "shell"}')
+        rows.append('?  Ayuda y atajos  [F1]')
+        header='Enter / doble clic: abrir | Ctrl+N: nueva | Ctrl+R: actualizar | F1: ayuda\nEsc: salir; las terminales siguen en la VM.'
+        if message: header+='\n'+message
+        selected=choose(rows,'Dev Sessions · '+str(len(saved))+' terminales',header,
+                        str(HOME/'.local/bin/dev')+' preview {1}',
+                        hotkeys={'ctrl-n':'\0new','ctrl-r':'\0refresh','f12':'\0refresh'})
+        message=''
+        if not selected: return
+        if selected=='\0refresh': continue
+        if selected.startswith('?'):
+            show_help()
+            continue
+        try:
+            if selected.startswith('+') or selected=='\0new': did_attach=create_interactive()
+            else:
+                did_attach=attach(selected.split('  |',1)[0])
+                if not did_attach: message='Esa terminal ya no esta disponible. Lista actualizada.'
+        except ValueError as error:
+            message=str(error)
+            continue
+        if did_attach and os.environ.get('TMUX'): return
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    sub=parser.add_subparsers(dest='action')
+    sub.add_parser('list')
+    sub.add_parser('help')
+    show=sub.add_parser('preview'); show.add_argument('name')
+    a=sub.add_parser('attach'); a.add_argument('name')
+    n=sub.add_parser('new'); n.add_argument('name'); n.add_argument('--cwd',default=str(HOME/'projects')); n.add_argument('--profile',default='shell'); n.add_argument('--detached',action='store_true')
+    args=parser.parse_args()
+    if args.action == 'list':
+        for row in sessions(): print('\t'.join(row))
+    elif args.action == 'help': show_help()
+    elif args.action == 'preview':
+        if args.name == '+':
+            print('NUEVA TERMINAL\n\n1. Elige el proyecto o la rama.\n2. Elige shell o herramienta.\n3. Ponle un nombre.\n\nCtrl+N tambien inicia estos pasos.\n\nPodras desconectarte y continuar luego desde la misma terminal.')
+        elif args.name == '?':
+            print('AYUDA SIEMPRE A MANO\n\nF1 abre la ayuda.\n\nDentro de una terminal, Ctrl+B resalta las teclas disponibles en la barra inferior.\n\nNo tienes que mantener Ctrl mientras pulsas la segunda tecla.')
+        else:
+            result=tmux('list-panes','-s','-t',args.name,'-F','#{window_index}\t#{pane_index}\t#{pane_current_command}\t#{pane_current_path}',check=False)
+            if result.returncode:
+                print('Esta terminal se ha cerrado.\nPulsa Ctrl+R para actualizar la lista.')
+            else:
+                print('TERMINAL: '+args.name+'\n\nEnter reconecta sin reiniciar el proceso.\n')
+                for line in result.stdout.splitlines():
+                    window,pane,process,cwd=line.split('\t',3)
+                    print('Ventana '+window+' · panel '+pane+' · '+process)
+                    print(cwd.replace(str(HOME),'~',1)+'\n')
+    elif args.action == 'attach': attach(args.name)
+    elif args.action == 'new': new(args.name,args.cwd,args.profile,not args.detached)
+    else: menu()
+
+if __name__ == '__main__':
+    try: main()
+    except KeyboardInterrupt: pass
+    except ValueError as error:
+        print(str(error),file=sys.stderr)
+        raise SystemExit(1)

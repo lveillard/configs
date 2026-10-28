@@ -1,0 +1,51 @@
+#!/bin/bash
+# Stop the named tmux-backed agent and close its remaining WezTerm panes.
+set -euo pipefail
+if [ "$#" -ne 1 ] || [ -z "$1" ] || [ "$1" = default ]; then
+  echo 'usage: agent-kill <non-default session name>' >&2
+  exit 2
+fi
+name=$1
+tname=$(printf %s "$name" | tr -c 'A-Za-z0-9_-' '_')
+export WEZTERM_UNIX_SOCKET=${WEZTERM_UNIX_SOCKET:-"$HOME/.local/state/wezterm/dev-server.sock"}
+
+if tmux has-session -t "=$tname" 2>/dev/null; then
+  tmux kill-session -t "=$tname"
+  echo "tmux session $tname killed"
+else
+  echo "no tmux session $tname"
+fi
+
+# Session names are data, never interpolated into Python source. If the mux is
+# absent, the agent is already stopped above; do not start a new mux for cleanup.
+python3 - "$name" <<'PY'
+import json
+import os
+import subprocess
+import sys
+
+socket = os.environ['WEZTERM_UNIX_SOCKET']
+def identity():
+    stat = os.stat(socket)
+    return stat.st_dev, stat.st_ino, stat.st_ctime_ns
+
+def panes():
+    return json.loads(subprocess.check_output(
+        ['wezterm', 'cli', '--no-auto-start', 'list', '--format', 'json']))
+
+try:
+    initial = identity()
+except FileNotFoundError:
+    print('WezTerm mux is absent; no panes to close')
+    raise SystemExit(0)
+name = sys.argv[1]
+targets = [p['pane_id'] for p in panes() if p['workspace'] == name]
+for pane_id in targets:
+    current = panes()
+    if identity() != initial:
+        raise SystemExit('Mux changed; refusing to close panes')
+    if any(p['pane_id'] == pane_id and p['workspace'] == name for p in current):
+        subprocess.run(['wezterm', 'cli', '--no-auto-start', 'kill-pane',
+                        '--pane-id', str(pane_id)], check=True)
+        print(f'pane {pane_id} closed')
+PY

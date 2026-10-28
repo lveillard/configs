@@ -1,0 +1,9 @@
+title = "configs secret scanning"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Literal environment-variable name in the credential-isolation list"
+regexTarget = "secret"
+regexes = ['''^QWEN38_API_KEY$''']

@@ -1,0 +1,12 @@
+add_newline = false
+format = "$env_var$directory$git_branch$git_status$cmd_duration$line_break$character"
+[env_var.BOX_LABEL]
+format = "[$env_value](bold cyan) "
+[directory]
+truncation_length = 4
+truncate_to_repo = false
+[git_branch]
+symbol = "git:"
+[character]
+success_symbol = "[>](bold green)"
+error_symbol = "[>](bold red)"

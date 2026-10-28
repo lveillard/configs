@@ -1,0 +1,43 @@
+# zsh for the dev boxes. History is kept by atuin, per directory on Up-arrow.
+export PATH="$HOME/.local/bin:$HOME/.local/share/dev-tools/node/bin:$HOME/.bun/bin:$HOME/.atuin/bin:$PATH"
+export EDITOR=vim
+export BOX_LABEL="$(cat "$HOME/.config/box-label" 2>/dev/null || hostname)"
+HISTFILE="$HOME/.local/state/zsh/history"
+HISTSIZE=100000
+SAVEHIST=100000
+setopt HIST_IGNORE_SPACE HIST_IGNORE_ALL_DUPS SHARE_HISTORY INC_APPEND_HISTORY AUTO_CD INTERACTIVE_COMMENTS AUTO_PUSHD PUSHD_IGNORE_DUPS
+bindkey -e
+autoload -Uz compinit && compinit -d "$HOME/.local/state/zsh/zcompdump"
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
+
+# Navigation keys as WezTerm, tmux and phone SSH apps send them, so they move instead of printing ;2D or ~.
+bindkey '^[[H' beginning-of-line;  bindkey '^[[1~' beginning-of-line; bindkey '^[OH' beginning-of-line
+bindkey '^[[F' end-of-line;        bindkey '^[[4~' end-of-line;       bindkey '^[OF' end-of-line
+bindkey '^[[3~' delete-char
+bindkey '^[[1;5C' forward-word;    bindkey '^[[1;5D' backward-word
+bindkey '^[[1;3C' forward-word;    bindkey '^[[1;3D' backward-word
+bindkey '^[[1;2C' forward-char;    bindkey '^[[1;2D' backward-char
+bindkey '^[[1;2H' beginning-of-line; bindkey '^[[1;2F' end-of-line
+bindkey '^[[3;5~' kill-word
+bindkey '^H' backward-kill-word
+bindkey '^[[Z' reverse-menu-complete
+
+alias ll='ls -lah --color=auto'
+alias la='ls -A --color=auto'
+alias g='git'
+alias gs='git status --short --branch'
+alias gd='git diff'
+alias gl='git log --oneline -15'
+
+# Report the directory to WezTerm (new tabs and splits open in the same folder).
+_osc7() { printf '\e]7;file://%s%s\e\' "$HOST" "${PWD// /%20}"; }
+autoload -Uz add-zsh-hook && add-zsh-hook chpwd _osc7 && _osc7
+
+[[ -r /usr/share/doc/fzf/examples/completion.zsh ]] && source /usr/share/doc/fzf/examples/completion.zsh
+[[ -r /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+command -v starship >/dev/null && eval "$(starship init zsh)"
+# Ctrl+R: full-history search (Tab cycles global/host/session/directory). Up: this directory first.
+command -v atuin >/dev/null && eval "$(atuin init zsh)"
+[[ -r /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
